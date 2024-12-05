@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Interactive Todo List</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: black;
+            font-family: 'Courier', monospace;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
+</head>
+<body>
+    <script>
+        let items = [
+            "□ Complete work assignments", 
+            "□ Tidy up the room", 
+            "□ Exercise for 30 minutes", 
+            "□ Respond to emails", 
+            "□ Attend meetings", 
+            "□ Prepare presentation", 
+            "□ Finish online course", 
+            "□ Research industry trends", 
+            "□ Check project deadlines", 
+            "□ Analyze data", 
+            "□ Call clients", 
+            "□ Share files with the team", 
+            "□ Organize workspace", 
+            "□ Follow up on tasks", 
+            "□ Write progress reports", 
+            "□ Proofread documents", 
+            "□ Update the calendar", 
+            "□ Take meeting notes", 
+            "□ Schedule meetings", 
+            "□ Submit expense reports"
+        ];
+
+        let textPositions = [];
+        let avoidRadius = 80;
+        let fontSize;
+        let lastMouseX, lastMouseY;
+        let mouseStillTimer = 0;
+        const MOUSE_STILL_THRESHOLD = 180;
+        const SCALE_RADIUS = 400;
+        const MAX_SCALE = 4.0;
+        const MAX_OFFSET = 150;
+
+        function setup() {
+            createCanvas(windowWidth, windowHeight);
+            background(0);
+            textAlign(LEFT, TOP);
+            textFont('Courier');
+            fontSize = min(windowWidth, windowHeight) / 35;
+            textSize(fontSize);
+            let lineHeight = fontSize * 1.5;
+            let margin = fontSize;
+            textPositions = [];
+            lastMouseX = mouseX;
+            lastMouseY = mouseY;
+            
+            for (let y = margin; y < height - margin; y += lineHeight) {
+                let currentX = margin;
+                while (currentX < width - margin) {
+                    let txt = items[floor(random(items.length))];
+                    let txtWidth = textWidth(txt);
+                    if (currentX + txtWidth > width - margin) {
+                        break;
+                    }
+                    textPositions.push({
+                        x: currentX,
+                        y: y,
+                        text: txt,
+                        originalX: currentX,
+                        originalY: y,
+                        width: txtWidth,
+                        velocityX: 0,
+                        velocityY: 0,
+                        scale: 1,
+                        targetScale: 1
+                    });
+                    currentX += txtWidth + (fontSize * 0.3);
+                }
+            }
+        }
+
+        function draw() {
+            background(0);
+            
+            let mouseMoved = (abs(mouseX - lastMouseX) > 1 || abs(mouseY - lastMouseY) > 1);
+            
+            if (!mouseMoved) {
+                mouseStillTimer = min(mouseStillTimer + 1, MOUSE_STILL_THRESHOLD);
+            } else {
+                mouseStillTimer = 0;
+            }
+            
+            lastMouseX = mouseX;
+            lastMouseY = mouseY;
+            
+            let canScale = mouseStillTimer >= MOUSE_STILL_THRESHOLD;
+            
+            textPositions.forEach(pos => {
+                let textWidth = pos.width;
+                let textHeight = fontSize;
+                let centerX = pos.x + textWidth/2;
+                let centerY = pos.y + textHeight/2;
+                let distance = dist(mouseX, mouseY, centerX, centerY);
+                
+                if (distance < SCALE_RADIUS && canScale) {
+                    let distanceFactor = 1.1 - (distance / SCALE_RADIUS);
+                    distanceFactor = distanceFactor * distanceFactor;
+                    let scaleFactor = map(distanceFactor, 0, 1, 1, MAX_SCALE);
+                    pos.targetScale = scaleFactor;
+                } else {
+                    pos.targetScale = 1;
+                }
+                
+                pos.scale += (pos.targetScale - pos.scale) * 0.1;
+                
+                let moveForce = 8 * (1 + (pos.scale - 1) * 2);
+                
+                if (distance < avoidRadius * (1 + (pos.scale - 1) * 0.5)) {
+                    let angle = atan2(centerY - mouseY, centerX - mouseX);
+                    let pushFactor = map(distance, 0, avoidRadius, 1.5, 1);
+                    pos.velocityX += cos(angle) * moveForce * pushFactor;
+                    pos.velocityY += sin(angle) * moveForce * pushFactor;
+                }
+                
+                pos.velocityX *= 0.9;
+                pos.velocityY *= 0.9;
+                pos.x += pos.velocityX;
+                pos.y += pos.velocityY;
+                
+                pos.x = constrain(
+                    pos.x, 
+                    pos.originalX - MAX_OFFSET * (1 + (pos.scale - 1) * 0.5), 
+                    pos.originalX + MAX_OFFSET * (1 + (pos.scale - 1) * 0.5)
+                );
+                pos.y = constrain(
+                    pos.y, 
+                    pos.originalY - MAX_OFFSET * (1 + (pos.scale - 1) * 0.5), 
+                    pos.originalY + MAX_OFFSET * (1 + (pos.scale - 1) * 0.5)
+                );
+                
+                pos.x += (pos.originalX - pos.x) * 0.05;
+                pos.y += (pos.originalY - pos.y) * 0.05;
+                
+                let alpha = map(pos.scale, 1, MAX_SCALE, 255, 200);
+                fill(255, alpha);
+                push();
+                translate(centerX, centerY);
+                scale(pos.scale);
+                text(pos.text, -textWidth/2, -textHeight/2);
+                pop();
+            });
+        }
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+            setup();
+        }
+    </script>
+</body>
+</html>
